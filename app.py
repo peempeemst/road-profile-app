@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+import matplotlib.ticker as ticker
 import urllib.request
 import os
 import io
@@ -17,7 +18,6 @@ def load_thai_font():
         urllib.request.urlretrieve("https://github.com/Phonbopit/sarabun-webfont/raw/master/fonts/thsarabunnew-webfont.ttf", font_path)
     fm.fontManager.addfont(font_path)
     plt.rcParams['font.family'] = 'TH Sarabun New'
-    plt.rcParams['font.size'] = 14
 
 load_thai_font()
 
@@ -96,8 +96,6 @@ if calculate_btn:
     # ==========================================
     # 6. กล่องตรวจสอบความคลาดเคลื่อน (Error Check)
     # ==========================================
-    st.subheader("การตรวจสอบความคลาดเคลื่อน (Error Check)")
-    
     sum_bs = df['B.S.'].astype(float).sum()
     sum_fs = df['F.S.'].astype(float).sum()
     first_elev = df['Elev.'].iloc[0]
@@ -107,6 +105,7 @@ if calculate_btn:
     diff_elev = last_elev - first_elev
     is_correct = round(diff_bs_fs, 3) == round(diff_elev, 3)
     
+    st.subheader("การตรวจสอบความคลาดเคลื่อน (Error Check)")
     col_err1, col_err2, col_err3 = st.columns(3)
     with col_err1:
         st.metric(label="ΣB.S. - ΣF.S.", value=f"{diff_bs_fs:.3f}")
@@ -121,9 +120,9 @@ if calculate_btn:
     st.markdown("---")
 
     # ==========================================
-    # 7. วาดรูปตัดตามยาวลงกระดาษ A4 พร้อม Title Block
+    # 7. วาดรูปตัดตามยาวลงกระดาษ A4 สไตล์วิศวกรรม (CAD Style)
     # ==========================================
-    st.subheader("3. รูปตัดตามยาวโครงการ (Longitudinal Profile)")
+    st.subheader("3. รูปตัดตามยาวโครงการ (Longitudinal Profile) พร้อมพิมพ์")
     
     def parse_sta(sta_str):
         if isinstance(sta_str, str) and '+' in sta_str:
@@ -139,35 +138,35 @@ if calculate_btn:
     plot_df['Design Elev.'] = pd.to_numeric(plot_df['Design Elev.'], errors='coerce')
     
     if len(plot_df) > 1:
-        # กำหนดขนาดหน้ากระดาษ A4 แนวนอน (11.69 x 8.27 นิ้ว)
+        # A4 Landscape (11.69 x 8.27 นิ้ว)
         fig = plt.figure(figsize=(11.69, 8.27), dpi=300)
         
-        # แบ่งสัดส่วนหน้ากระดาษ
-        ax = fig.add_axes([0.08, 0.35, 0.70, 0.55]) 
+        # ปรับพื้นที่กราฟ: [left, bottom, width, height]
+        ax = fig.add_axes([0.08, 0.40, 0.70, 0.50]) 
         
-        ax.plot(plot_df['Distance (m)'], plot_df['Elev.'], color='blue', linewidth=1.5, label='ระดับดินเดิม (Existing Ground)')
-        
+        # วาดกราฟ
+        ax.plot(plot_df['Distance (m)'], plot_df['Elev.'], color='blue', linewidth=1.5, label='Existing Ground')
         if plot_df['Design Elev.'].notna().any():
-            ax.plot(plot_df['Distance (m)'], plot_df['Design Elev.'], color='red', linewidth=1.5, label='ระดับก่อสร้าง (Design Grade)')
+            ax.plot(plot_df['Distance (m)'], plot_df['Design Elev.'], color='red', linewidth=1.5, label='Design Grade')
             
             elev_array = np.array(plot_df['Elev.'], dtype=float)
             design_array = np.array(plot_df['Design Elev.'], dtype=float)
             dist_array = np.array(plot_df['Distance (m)'], dtype=float)
             
-            ax.fill_between(dist_array, elev_array, design_array, 
-                            where=(design_array > elev_array), 
-                            color='red', alpha=0.15, hatch='//')
-            ax.fill_between(dist_array, elev_array, design_array, 
-                            where=(design_array < elev_array), 
-                            color='blue', alpha=0.15, hatch='\\\\')
+            ax.fill_between(dist_array, elev_array, design_array, where=(design_array > elev_array), color='red', alpha=0.15, hatch='//')
+            ax.fill_between(dist_array, elev_array, design_array, where=(design_array < elev_array), color='blue', alpha=0.15, hatch='\\\\')
 
         ax.set_title('รูปตัดตามยาวโครงการสร้างทาง (Longitudinal Road Profile)', fontsize=18, pad=15)
-        ax.set_ylabel('ค่าระดับความสูง (m)', fontsize=12)
-        ax.set_xticks(plot_df['Distance (m)'])
-        ax.set_xticklabels([]) 
-        ax.grid(True, which='both', linestyle='--', linewidth=0.5, color='gray', alpha=0.5)
+        ax.set_ylabel('ค่าระดับความสูง (m)', fontsize=14)
         
-        # สร้าง Data Band
+        # การตั้งค่า Grid แบบกระดาษกราฟวิศวกรรม
+        ax.set_xticks(plot_df['Distance (m)'])
+        ax.set_xticklabels([]) # ซ่อนตัวหนังสือแกน X เพื่อใช้ตารางแทน
+        ax.minorticks_on()
+        ax.grid(which='major', color='#666666', linestyle='-', linewidth=0.5, alpha=0.8)
+        ax.grid(which='minor', color='#999999', linestyle=':', linewidth=0.5, alpha=0.5)
+
+        # สร้างตารางข้อมูลด้านล่าง (Data Band) แบบแนบชิด
         table_data = [
             plot_df['Sta.'].tolist(),
             plot_df['Elev.'].map(lambda x: f"{x:.3f}").tolist(),
@@ -175,41 +174,66 @@ if calculate_btn:
         ]
         row_labels = ['ระยะทาง / สถานี (STA)', 'ระดับดินเดิม\n(Existing Ground Level)', 'ระดับออกแบบ\n(Design Grade Level)']
         
-        data_table = ax.table(cellText=table_data, rowLabels=row_labels, 
-                              loc='bottom', bbox=[0, -0.4, 1, 0.35], cellLoc='center')
+        data_table = ax.table(cellText=table_data, rowLabels=row_labels, loc='bottom', bbox=[0, -0.35, 1, 0.35], cellLoc='center')
         data_table.auto_set_font_size(False)
-        data_table.set_fontsize(10)
-        data_table.scale(1, 2)
+        data_table.set_fontsize(11)
 
-        # สร้าง Title Block
-        ax_title = fig.add_axes([0.80, 0.05, 0.15, 0.85]) 
-        ax_title.axis('off') 
+        # ==========================================
+        # การสร้าง Title Block ด้านขวามือให้เหมือนเขียนแบบ
+        # ==========================================
+        ax_tb = fig.add_axes([0.80, 0.05, 0.17, 0.85]) 
+        ax_tb.axis('off') 
         
-        tb_text = (
-            "รูปตัดตามยาว\nโครงการก่อสร้างทาง\n(Longitudinal Road Profile)\n\n"
-            "--------------------------\n"
-            "Horizontal Scale 1:1000\n"
-            "Vertical Scale 1:100\n"
-            "--------------------------\n"
-            "สำรวจ / ออกแบบ:\n"
-            "นายอุดมพงศ์ วะชุม\n"
-            "วิศวกรโยธา\n\n"
-            "ตรวจสอบ:\n"
-            "........................\n\n"
-            "อนุมัติ:\n"
-            "........................\n"
-            "--------------------------\n"
-            "องค์การบริหารส่วนตำบลนาหว้า\n"
-            "อ.นาหว้า จ.นครพนม\n"
-            "--------------------------\n"
-            "แผ่นที่: 1 / 1"
+        # วาดกรอบนอกของ Title Block
+        ax_tb.add_patch(plt.Rectangle((0, 0), 1, 1, fill=False, edgecolor='black', lw=1.5, transform=ax_tb.transAxes))
+        
+        # ตีเส้นแบ่งช่อง (Row) ใน Title Block
+        lines_y = [0.85, 0.75, 0.40, 0.20, 0.10]
+        for y in lines_y:
+            ax_tb.plot([0, 1], [y, y], color='black', lw=1, transform=ax_tb.transAxes)
+            
+        # ใส่ข้อความลงในช่องต่างๆ ตามพิกัด
+        # ช่อง 1: หัวข้อโครงการ
+        ax_tb.text(0.5, 0.925, "รูปตัดตามยาว\nโครงการก่อสร้างทาง\n(Longitudinal Road Profile)", 
+                   fontsize=14, weight='bold', ha='center', va='center', transform=ax_tb.transAxes)
+        # ช่อง 2: มาตราส่วน
+        ax_tb.text(0.5, 0.80, "Horizontal Scale 1:1000\nVertical Scale 1:100", 
+                   fontsize=12, ha='center', va='center', transform=ax_tb.transAxes)
+        # ช่อง 3: ลายเซ็นต์
+        ax_tb.text(0.05, 0.73, "สำรวจ / ออกแบบ:", fontsize=12, ha='left', va='top', transform=ax_tb.transAxes)
+        ax_tb.text(0.5, 0.65, "นายอุดมพงศ์ วะชุม\nวิศวกรโยธา", fontsize=12, ha='center', va='center', transform=ax_tb.transAxes)
+        
+        ax_tb.text(0.05, 0.55, "ตรวจสอบ:", fontsize=12, ha='left', va='top', transform=ax_tb.transAxes)
+        ax_tb.text(0.5, 0.50, "..................................", fontsize=12, ha='center', va='center', transform=ax_tb.transAxes)
+        
+        ax_tb.text(0.05, 0.47, "อนุมัติ:", fontsize=12, ha='left', va='top', transform=ax_tb.transAxes)
+        ax_tb.text(0.5, 0.43, "..................................", fontsize=12, ha='center', va='center', transform=ax_tb.transAxes)
+        
+        # ช่อง 4: หน่วยงาน
+        ax_tb.text(0.5, 0.30, "องค์การบริหารส่วนตำบลนาหว้า\nอ.นาหว้า จ.นครพนม", 
+                   fontsize=13, weight='bold', ha='center', va='center', transform=ax_tb.transAxes)
+        
+        # ช่อง 5: เลขแบบ
+        ax_tb.text(0.5, 0.15, "Drawing Border", fontsize=12, ha='center', va='center', transform=ax_tb.transAxes)
+        ax_tb.text(0.5, 0.05, "แผ่นที่: 1 / 1", fontsize=13, ha='center', va='center', transform=ax_tb.transAxes)
+
+        # แสดงผลบนเว็บ
+        st.pyplot(fig)
+        
+        # ==========================================
+        # ปุ่มดาวน์โหลด PDF ที่ทำงานได้ 100%
+        # ==========================================
+        st.markdown("### 🖨️ เมนูสั่งพิมพ์")
+        buf = io.BytesIO()
+        fig.savefig(buf, format="pdf", bbox_inches='tight')
+        buf.seek(0) # แก้บั๊กไฟล์ว่างเปล่า
+        
+        st.download_button(
+            label="📄 ดาวน์โหลดรูปตัด (PDF) ขนาด A4 เพื่อนำไปปริ้น",
+            data=buf,
+            file_name="Longitudinal_Profile_NaWa.pdf",
+            mime="application/pdf",
+            use_container_width=True
         )
-        
-        rect = plt.Rectangle((0, 0), 1, 1, fill=False, edgecolor='black', linewidth=1, transform=ax_title.transAxes)
-        ax_title.add_patch(rect)
-        ax_title.text(0.5, 0.5, tb_text, transform=ax_title.transAxes, fontsize=11, 
-                      ha='center', va='center', multialignment='center')
-
-        st.pyplot(fig, use_container_width=False)
-        
-        # ปุ่มดาวน์โหลด PDF
+    else:
+        st.info("ระบุข้อมูลระยะทาง (Sta.) ให้ถูกต้องเพื่อวาดกราฟ")
