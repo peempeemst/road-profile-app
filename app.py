@@ -25,14 +25,20 @@ load_thai_font()
 # ==========================================
 st.set_page_config(page_title="โปรแกรมงานระดับมาตรฐาน", layout="wide")
 st.title("โปรแกรมคำนวณงานระดับและวาดรูปตัด (Profile Leveling)")
+st.markdown("---")
 
 # ==========================================
 # 3. ส่วนการรับข้อมูล (ตาราง Field Book)
 # ==========================================
-st.subheader("1. กรอกข้อมูลสมุดจดงานระดับ (Field Book)")
-bm_elev = st.number_input("ค่าระดับจุดเริ่มต้น BM.1 (First Elev.):", value=100.000, format="%.3f")
+st.subheader("1. ข้อมูลสมุดจดงานระดับ (Field Book)")
 
-# จำลองข้อมูลเริ่มต้นให้เหมือนในรูปตัวอย่างเป๊ะๆ
+# แบ่งคอลัมน์เพื่อความสวยงาม
+col1, col2 = st.columns([1, 2])
+with col1:
+    bm_elev = st.number_input("ค่าระดับจุดเริ่มต้น BM.1 (First Elev.):", value=100.000, format="%.3f")
+with col2:
+    st.info("💡 สามารถคัดลอกข้อมูลจาก Excel มาวาง (Ctrl+V) ลงในตารางด้านล่างได้โดยตรง")
+
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame({
         'Sta.': ['BM.1', '0+000', '0+025', '0+050', '0+075', '0+100', 'TP.1', '0+125', '0+150', '0+175', '0+200', '0+225', '0+250', 'BM.2'],
@@ -43,48 +49,46 @@ if 'data' not in st.session_state:
         'Remark': ['สมมุติ', '', '', '', '', '', '', '', '', '', '', '', '', '']
     })
 
-# แสดงตารางให้ผู้ใช้งานกรอก (ซ่อนคอลัมน์คำนวณไว้ก่อน)
-st.write("📝 *ตารางนี้สามารถคัดลอกข้อมูลจาก Excel มาวาง (Ctrl+V) หรือพิมพ์ตัวเลขลงไปได้โดยตรง*")
-edited_df = st.data_editor(st.session_state.data, num_rows="dynamic", use_container_width=True)
+# ปรับขนาดความสูงตารางให้เหมาะสม
+edited_df = st.data_editor(st.session_state.data, num_rows="dynamic", use_container_width=True, height=350)
+
+# ปุ่มประมวลผลขนาดใหญ่
+st.markdown("<br>", unsafe_allow_html=True)
+calculate_btn = st.button("ประมวลผลคำนวณค่าระดับ และสร้างรูปตัด", type="primary", use_container_width=True)
+st.markdown("---")
 
 # ==========================================
 # 4. ปุ่มประมวลผลและการคำนวณ
 # ==========================================
-if st.button("ประมวลผลคำนวณค่าระดับ และวาดแบบ", type="primary"):
+if calculate_btn:
     df = edited_df.copy()
     
-    # สร้างคอลัมน์เก็บผลลัพธ์
     df['H.I.'] = np.nan
     df['Elev.'] = np.nan
     current_hi = np.nan
     
-    # อัลกอริทึมคำนวณแบบวิ่งทีละแถว (เหมือนช่างสำรวจกดเครื่องคิดเลข)
     for idx, row in df.iterrows():
-        # แปลงค่าให้เป็นตัวเลขอย่างปลอดภัย (ป้องกันผู้ใช้พิมพ์ช่องว่าง)
         bs = float(row['B.S.']) if pd.notna(row['B.S.']) and str(row['B.S.']).strip() != '' else np.nan
         ifs = float(row['I.F.S.']) if pd.notna(row['I.F.S.']) and str(row['I.F.S.']).strip() != '' else np.nan
         fs = float(row['F.S.']) if pd.notna(row['F.S.']) and str(row['F.S.']).strip() != '' else np.nan
         
-        # ก. การหาค่า Elev.
         if idx == 0:
-            df.at[idx, 'Elev.'] = bm_elev # แถวแรกรับค่าเริ่มต้น
+            df.at[idx, 'Elev.'] = bm_elev
         else:
             if pd.notna(ifs):
                 df.at[idx, 'Elev.'] = current_hi - ifs
             elif pd.notna(fs):
                 df.at[idx, 'Elev.'] = current_hi - fs
                 
-        # ข. การหาค่า H.I. (ตั้งกล้องใหม่)
         if pd.notna(bs):
             current_hi = df.at[idx, 'Elev.'] + bs
             df.at[idx, 'H.I.'] = current_hi
 
     # ==========================================
-    # 5. แสดงตารางผลลัพธ์ฉบับสมบูรณ์
+    # 5. แสดงตารางผลลัพธ์
     # ==========================================
     st.subheader("2. ตารางผลการคำนวณ (Completed Field Book)")
     
-    # จัดรูปแบบตารางให้แสดงทศนิยม 3 ตำแหน่ง
     display_df = df[['Sta.', 'B.S.', 'H.I.', 'I.F.S.', 'F.S.', 'Elev.', 'Remark']].copy()
     for col in ['B.S.', 'H.I.', 'I.F.S.', 'F.S.', 'Elev.']:
         display_df[col] = display_df[col].map(lambda x: f"{x:.3f}" if pd.notna(x) else "")
@@ -94,6 +98,8 @@ if st.button("ประมวลผลคำนวณค่าระดับ �
     # ==========================================
     # 6. กล่องตรวจสอบความคลาดเคลื่อน (Error Check)
     # ==========================================
+    st.subheader("การตรวจสอบความคลาดเคลื่อน (Error Check)")
+    
     sum_bs = df['B.S.'].astype(float).sum()
     sum_fs = df['F.S.'].astype(float).sum()
     first_elev = df['Elev.'].iloc[0]
@@ -101,32 +107,27 @@ if st.button("ประมวลผลคำนวณค่าระดับ �
     
     diff_bs_fs = sum_bs - sum_fs
     diff_elev = last_elev - first_elev
-    
-    # เช็คว่าผลต่างเท่ากันหรือไม่ (เผื่อทศนิยมคลาดเคลื่อนเล็กน้อย ใช้ round เช็ค)
     is_correct = round(diff_bs_fs, 3) == round(diff_elev, 3)
     
-    st.subheader("ตรวจสอบการคำนวณ")
-    if is_correct:
-        st.success(f"""
-        **ผลรวม ΣB.S. - ΣF.S. = Last Elev. - First Elev.**  ✅ (คำนวณถูกต้อง)
-        
-        * {sum_bs:.3f} - {sum_fs:.3f} = **{diff_bs_fs:.3f}**
-        * {last_elev:.3f} - {first_elev:.3f} = **{diff_elev:.3f}**
-        """)
-    else:
-        st.error(f"""
-        **มีข้อผิดพลาดในการคำนวณ หรือจดค่าผิดพลาด** ❌
-        
-        * ΣB.S. - ΣF.S. = **{diff_bs_fs:.3f}**
-        * Last Elev. - First Elev. = **{diff_elev:.3f}**
-        """)
+    # แสดงผลแบบ Metric Cards
+    col_err1, col_err2, col_err3 = st.columns(3)
+    with col_err1:
+        st.metric(label="ΣB.S. - ΣF.S.", value=f"{diff_bs_fs:.3f}")
+    with col_err2:
+        st.metric(label="Last Elev. - First Elev.", value=f"{diff_elev:.3f}")
+    with col_err3:
+        if is_correct:
+            st.success("✅ คำนวณถูกต้อง (Passed)")
+        else:
+            st.error("❌ ข้อมูลคลาดเคลื่อน (Failed)")
+
+    st.markdown("---")
 
     # ==========================================
-    # 7. วาดรูปตัดตามยาว (กรองเฉพาะ Sta. ที่เป็นตัวเลข)
+    # 7. วาดรูปตัดตามยาว 
     # ==========================================
     st.subheader("3. รูปตัดตามยาวโครงการ (Longitudinal Profile)")
     
-    # ฟังก์ชันแปลง '0+025' เป็นระยะทาง 25 สำหรับพล็อตกราฟ (ละเว้น BM และ TP อัตโนมัติ)
     def parse_sta(sta_str):
         if isinstance(sta_str, str) and '+' in sta_str:
             parts = sta_str.split('+')
@@ -137,22 +138,18 @@ if st.button("ประมวลผลคำนวณค่าระดับ �
         return np.nan
         
     df['Distance (m)'] = df['Sta.'].apply(parse_sta)
-    
-    # ดึงเฉพาะข้อมูลเส้นทางหลัก (ตัด BM, TP ออกไปจากการวาดกราฟ)
     plot_df = df.dropna(subset=['Distance (m)', 'Elev.']).copy()
     plot_df['Design Elev.'] = pd.to_numeric(plot_df['Design Elev.'], errors='coerce')
     
     if len(plot_df) > 1:
-        fig, ax = plt.subplots(figsize=(15, 6))
+        # ปรับขนาดกราฟให้เหมาะสมกับหน้าจอเว็บ
+        fig, ax = plt.subplots(figsize=(12, 4.5))
         
-        # วาดกราฟ
         ax.plot(plot_df['Distance (m)'], plot_df['Elev.'], color='blue', linewidth=2, label='ระดับดินเดิม')
         
-        # วาดระดับออกแบบ และแรเงา (ถ้ามีการกรอก Design Elev.)
         if plot_df['Design Elev.'].notna().any():
             ax.plot(plot_df['Distance (m)'], plot_df['Design Elev.'], color='red', linewidth=2, label='ระดับก่อสร้าง')
             
-            # บังคับข้อมูลเป็นตัวเลขสำหรับการแรเงา
             elev_array = np.array(plot_df['Elev.'], dtype=float)
             design_array = np.array(plot_df['Design Elev.'], dtype=float)
             dist_array = np.array(plot_df['Distance (m)'], dtype=float)
@@ -171,20 +168,7 @@ if st.button("ประมวลผลคำนวณค่าระดับ �
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax.legend(loc='upper right')
         
-        st.pyplot(fig)
+        # บังคับให้กราฟแสดงผลเต็มความกว้างหน้าจอ
+        st.pyplot(fig, use_container_width=True)
     else:
         st.info("ระบุข้อมูลระยะทาง (Sta.) ในรูปแบบ 0+000 ให้ครบถ้วนเพื่อแสดงกราฟ")
-```eof
-
-### สิ่งที่อัปเดตเพิ่มเติมในเวอร์ชันนี้:
-1.  **คอลัมน์ตรงเป๊ะ:** เปลี่ยนหัวตารางเป็น `Sta.`, `B.S.`, `I.F.S.`, `F.S.` แบบที่ช่างสำรวจคุ้นเคย
-2.  **รองรับ TP.1 และ BM.2:** สามารถใส่จุด Turning Point ตรงไหนก็ได้ในตาราง โปรแกรมจะคำนวณ F.S. ตัดระดับก่อน แล้วหา H.I. ใหม่ทันทีในบรรทัดเดียวกันให้โดยอัตโนมัติ
-3.  **กล่องสีเขียวตรวจสอบ Error:** เพิ่มระบบเช็ค `ΣBS - ΣFS = Last Elev - First Elev` ตอนท้ายตาราง หากตัวเลขตรงกัน จะขึ้นกล่องสีเขียวแจ้งว่า "คำนวณถูกต้อง ✅" แต่ถ้าจดค่ามาผิด จะขึ้นกล่องสีแดง ❌ 
-4.  **ความฉลาดในการวาดกราฟ:** กราฟจะวาดเฉพาะจุดที่เป็น Station (เช่น 0+000) โดยจะ **ข้าม** จุด TP และ BM ให้เองอัตโนมัติ ทำให้รูปวาดที่ได้มีความถูกต้องตามมาตรฐานงานวิศวกรรม
-
-**วิธีอัปเดตเข้าโปรแกรมของคุณ:**
-1. ไปที่ GitHub ของคุณ เปิดไฟล์ `app.py`
-2. กดไอคอน ✏️ (รูปดินสอ) มุมขวาบนเพื่อแก้ไขไฟล์
-3. ลบโค้ดเดิมทิ้งทั้งหมด แล้วก๊อปปี้โค้ดด้านบนนี้ไปวางแทน
-4. เลื่อนลงมากดปุ่มสีเขียว **Commit changes**
-5. รอ 1 นาที แล้วกลับไปหน้าเว็บโปรแกรมของคุณ กด F5 (Refresh) การเปลี่ยนแปลงใหม่ทั้งหมดจะแสดงขึ้นมาทันทีครับ!
