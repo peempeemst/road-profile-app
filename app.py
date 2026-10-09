@@ -63,7 +63,10 @@ if st.button("ประมวลผลและสร้างรูปตัด
 
     st.subheader("2. ตารางผลการคำนวณค่าระดับดินเดิม")
     st.dataframe(df[['STA (กม.)', 'B.S.', 'H.I.', 'I.S.', 'F.S.', 'Existing Elev.', 'Design Elev.']], use_container_width=True)
-
+# บังคับแปลงข้อมูลในคอลัมน์กราฟให้เป็นตัวเลขทั้งหมด
+    df['Distance (m)'] = pd.to_numeric(df['Distance (m)'], errors='coerce')
+    df['Existing Elev.'] = pd.to_numeric(df['Existing Elev.'], errors='coerce')
+    df['Design Elev.'] = pd.to_numeric(df['Design Elev.'], errors='coerce')
     st.subheader("3. รูปตัดตามยาวโครงการ (Longitudinal Profile)")
     fig, ax = plt.subplots(figsize=(15, 6))
     
